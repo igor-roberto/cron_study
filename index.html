@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Estudos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/pt.js"></script>
+    <style>
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+        .calendar-day { min-height: 90px; cursor: pointer; transition: all 0.2s; }
+        .calendar-day:hover { border-color: #10b981; background-color: #0f172a; }
+        .flatpickr-calendar { background: #1e293b; border: 1px solid #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); }
+        .flatpickr-day, .flatpickr-weekday, .flatpickr-current-month .flatpickr-monthDropdown-months { color: #f1f5f9 !important; }
+        .flatpickr-day:hover { background: #334155; }
+        .flatpickr-day.selected { background: #10b981 !important; border-color: #10b981 !important; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <header class="flex flex-col md:flex-row justify-between items-center bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-emerald-400">Meu Dashboard de Estudos</h1>
+                <p class="text-slate-400 text-sm">Controle de horas, monitoramento e produtividade</p>
+            </div>
+            <button onclick="exportarExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-5 rounded-xl transition shadow-lg shadow-emerald-900/30 flex items-center gap-2 cursor-pointer">
+                📊 Exportar para Excel
+            </button>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex flex-col justify-center items-center text-center">
+                <h2 class="text-lg font-semibold text-slate-300 mb-6 uppercase text-sm tracking-widest">Cronômetro Livre</h2>
+                
+                <div class="w-full bg-slate-950 border border-slate-700 rounded-2xl p-6 mb-8 flex items-center justify-center overflow-hidden">
+                    <span id="display" class="text-5xl lg:text-6xl font-mono font-bold text-white tracking-wider">
+                        00:00:00
+                    </span>
+                </div>
+
+                <div class="flex gap-4 justify-center w-full">
+                    <button id="btnPlayPause" onclick="alternarTimer()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer">
+                        Play
+                    </button>
+                    <button id="btnParar" onclick="pararTimer()" disabled class="flex-1 bg-rose-600/50 text-rose-300 font-bold py-3 px-4 rounded-xl cursor-not-allowed opacity-50 transition">
+                        Parar
+                    </button>
+                </div>
+
+                <button onclick="sincronizarRelogio()" class="mt-5 text-slate-500 hover:text-emerald-400 text-xs uppercase tracking-wider font-semibold transition cursor-pointer flex items-center gap-2">
+                    🔄 Sincronizar Tempo
+                </button>
+            </div>
+
+            <div class="lg:col-span-2 bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                    <h2 class="text-lg font-semibold text-slate-300 uppercase text-sm tracking-widest">Desempenho por Período</h2>
+                    
+                    <div class="flex items-center gap-2 text-sm">
+                        <input type="text" id="dataInicio" class="bg-slate-950 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg focus:outline-none focus:border-emerald-500 w-28 text-center cursor-pointer" placeholder="DD/MM/AAAA">
+                        <span class="text-slate-500">até</span>
+                        <input type="text" id="dataFim" class="bg-slate-950 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg focus:outline-none focus:border-emerald-500 w-28 text-center cursor-pointer" placeholder="DD/MM/AAAA">
+                        <button onclick="atualizarGrafico()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg transition cursor-pointer">Filtrar</button>
+                    </div>
+                </div>
+
+                <div class="flex-1 relative w-full min-h-[200px]">
+                    <canvas id="graficoEstudos"></canvas>
+                </div>
+                
+                <div class="mt-4 text-center bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
+                    <p class="text-sm text-slate-400">Total estudado no período selecionado:</p>
+                    <p id="textoTotalPeriodo" class="text-xl font-bold text-emerald-400 font-mono">00h 00m 00s</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="calendarMonthYear" class="text-xl font-bold text-slate-200"></h2>
+                <div class="flex gap-2">
+                    <button onclick="mudarMes(-1)" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition cursor-pointer">◀ Mês Anterior</button>
+                    <button onclick="mudarMes(1)" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition cursor-pointer">Próximo Mês ▶</button>
+                </div>
+            </div>
+
+            <div class="calendar-grid text-center font-semibold text-slate-400 text-xs uppercase mb-2">
+                <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+            </div>
+
+            <div id="calendarDays" class="calendar-grid"></div>
+        </div>
+    </div>
+
+    <div id="modalSalvar" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-md w-full shadow-2xl">
+            <h3 class="text-lg font-bold text-white mb-2">Sessão Finalizada! 🎉</h3>
+            <p id="modalTempoInfo" class="text-slate-400 text-sm mb-4"></p>
+            
+            <div class="mb-6">
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-2">Assunto / Matéria</label>
+                <input type="text" id="inputMateria" placeholder="Ex: Docker, AWS, Scripts Linux..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="flex gap-3 justify-end">
+                <button onclick="fecharModal('modalSalvar')" class="px-4 py-2 text-slate-400 hover:text-white transition cursor-pointer">Descartar</button>
+                <button id="btnSalvarSessao" onclick="salvarSessao()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 font-semibold text-white rounded-xl transition cursor-pointer">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalDia" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="tituloModalDia" class="text-xl font-bold text-emerald-400"></h3>
+                <button onclick="fecharModal('modalDia')" class="text-slate-400 hover:text-white text-2xl cursor-pointer">&times;</button>
+            </div>
+            <div id="listaSessoesDia" class="flex-1 overflow-y-auto space-y-3 pr-2 mb-4"></div>
+            <div class="mt-auto pt-4 border-t border-slate-700 flex justify-end">
+                <button onclick="fecharModal('modalDia')" class="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition cursor-pointer">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        flatpickr("#dataInicio", { dateFormat: "d/m/Y", locale: "pt" });
+        flatpickr("#dataFim", { dateFormat: "d/m/Y", locale: "pt" });
+
+        let sessoesSalvas = JSON.parse(localStorage.getItem('sessoesEstudo')) || [];
+        
+        // --- MOTOR DO CRONÔMETRO ---
+        let intervalo = null;
+        let estaRodando = false;
+        
+        let tempoAcumuladoMs = 0; 
+        let momentoPlayAtual = 0; 
+        let dataHoraInicioSessao = null; 
+
+        const display = document.getElementById('display');
+        const btnPlayPause = document.getElementById('btnPlayPause');
+        const btnParar = document.getElementById('btnParar');
+
+        // A SUA LÓGICA DE ATUALIZAÇÃO VISUAL APLICADA AQUI
+        function sincronizarRelogio() {
+            if (estaRodando) {
+                let tempoAtualMs = tempoAcumuladoMs + (Date.now() - momentoPlayAtual);
+                let segundosExatos = Math.floor(tempoAtualMs / 1000);
+                display.textContent = formatarTempo(segundosExatos);
+            }
+        }
+
+        // A MÁGICA: Ouve quando você volta para a aba e chama a sua lógica automaticamente
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                sincronizarRelogio();
+            }
+        });
+
+        function alternarTimer() {
+            if (estaRodando) {
+                // PAUSE
+                clearInterval(intervalo);
+                tempoAcumuladoMs += Date.now() - momentoPlayAtual;
+                
+                btnPlayPause.textContent = "Play";
+                btnPlayPause.className = "flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer";
+                estaRodando = false;
+            } else {
+                // PLAY
+                if (tempoAcumuladoMs === 0) {
+                    dataHoraInicioSessao = new Date(); 
+                }
+
+                momentoPlayAtual = Date.now(); 
+                
+                intervalo = setInterval(() => {
+                    let tempoAtualMs = tempoAcumuladoMs + (Date.now() - momentoPlayAtual);
+                    let segundosExatos = Math.floor(tempoAtualMs / 1000);
+                    display.textContent = formatarTempo(segundosExatos);
+                }, 250); 
+
+                btnPlayPause.textContent = "Pause";
+                btnPlayPause.className = "flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer";
+                btnParar.disabled = false;
+                btnParar.className = "flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer";
+                estaRodando = true;
+            }
+        }
+
+        function pararTimer() {
+            clearInterval(intervalo);
+            
+            if (estaRodando) {
+                tempoAcumuladoMs += Date.now() - momentoPlayAtual;
+            }
+            
+            estaRodando = false;
+            
+            let tempoTotalSegundos = Math.floor(tempoAcumuladoMs / 1000);
+            const tempoSessaoFinalizada = formatarTempo(tempoTotalSegundos);
+            const dataHoraFimSessao = new Date(); 
+
+            btnPlayPause.textContent = "Play";
+            btnPlayPause.className = "flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer";
+            btnParar.disabled = true;
+            btnParar.className = "flex-1 bg-rose-600/50 text-rose-300 font-bold py-3 px-4 rounded-xl cursor-not-allowed opacity-50 transition";
+            
+            document.getElementById('modalTempoInfo').innerHTML = `Tempo total: <span class="text-emerald-400 font-mono font-bold">${tempoSessaoFinalizada}</span>`;
+            
+            const btnSalvar = document.getElementById('btnSalvarSessao');
+            btnSalvar.dataset.duracao = tempoSessaoFinalizada;
+            btnSalvar.dataset.fim = dataHoraFimSessao.toISOString();
+            
+            document.getElementById('inputMateria').value = "";
+            document.getElementById('modalSalvar').classList.remove('hidden');
+            document.getElementById('inputMateria').focus();
+            
+            tempoAcumuladoMs = 0;
+            display.textContent = "00:00:00";
+        }
+
+        function salvarSessao() {
+            const btnSalvar = document.getElementById('btnSalvarSessao');
+            const duracaoExata = btnSalvar.dataset.duracao;
+            const dataFim = new Date(btnSalvar.dataset.fim);
+            
+            const input = document.getElementById('inputMateria');
+            const materia = input.value.trim() || "Estudo Geral";
+            
+            const novaSessao = {
+                id: Date.now(),
+                materia: materia,
+                duracao: duracaoExata,
+                data: dataFim.toISOString().split('T')[0],
+                horarioInicio: dataHoraInicioSessao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                horarioFim: dataFim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            };
+
+            sessoesSalvas.push(novaSessao);
+            atualizarBancoEDisplay();
+            fecharModal('modalSalvar');
+        }
+
+        // --- CALENDÁRIO ---
+        let dataAtual = new Date();
+
+        function renderizarCalendario() {
+            const ano = dataAtual.getFullYear();
+            const mes = dataAtual.getMonth();
+            const nomesMeses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            
+            document.getElementById('calendarMonthYear').textContent = `${nomesMeses[mes]} ${ano}`;
+
+            const primeiroDia = new Date(ano, mes, 1).getDay();
+            const totalDias = new Date(ano, mes + 1, 0).getDate();
+            const containerDias = document.getElementById('calendarDays');
+            containerDias.innerHTML = "";
+
+            for (let i = 0; i < primeiroDia; i++) {
+                containerDias.innerHTML += `<div class="bg-slate-800/20 rounded-xl"></div>`;
+            }
+
+            const hoje = new Date();
+
+            for (let dia = 1; dia <= totalDias; dia++) {
+                const dataString = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                const sessoesDoDia = sessoesSalvas.filter(s => s.data === dataString);
+                
+                let ehHoje = dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear();
+                let classeNumero = ehHoje ? "bg-blue-600 text-white px-1.5 py-0.5 rounded-md" : "text-slate-400";
+                
+                let htmlSessoes = sessoesDoDia.map(s => 
+                    `<div class="bg-emerald-900/60 border border-emerald-700/50 text-[10px] text-emerald-200 p-1 rounded mb-1 truncate">
+                        ${s.materia}
+                    </div>`
+                ).join('');
+
+                containerDias.innerHTML += `
+                    <div onclick="abrirDetalhesDia('${dataString}')" class="calendar-day bg-slate-900 border border-slate-700/60 p-2 rounded-xl flex flex-col overflow-hidden">
+                        <span class="text-xs font-bold mb-1 self-start ${classeNumero}">${dia}</span>
+                        <div class="flex-1 overflow-y-auto no-scrollbar">${htmlSessoes}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function mudarMes(direcao) {
+            dataAtual.setMonth(dataAtual.getMonth() + direcao);
+            renderizarCalendario();
+        }
+
+        // --- DETALHES DO DIA E EXCLUSÃO ---
+        function abrirDetalhesDia(dataString) {
+            const sessoes = sessoesSalvas.filter(s => s.data === dataString);
+            
+            const partes = dataString.split('-');
+            document.getElementById('tituloModalDia').textContent = `Estudos do dia ${partes[2]}/${partes[1]}/${partes[0]}`;
+            
+            const lista = document.getElementById('listaSessoesDia');
+            lista.innerHTML = "";
+
+            if(sessoes.length === 0) {
+                lista.innerHTML = `<p class="text-slate-400 text-center py-8">Nenhum estudo registrado neste dia.</p>`;
+            } else {
+                sessoes.forEach(s => {
+                    let txtHorario = s.horarioInicio ? `${s.horarioInicio} às ${s.horarioFim}` : s.horario;
+
+                    lista.innerHTML += `
+                        <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 flex justify-between items-center gap-4">
+                            <div class="overflow-hidden">
+                                <h4 class="font-bold text-slate-200 truncate" title="${s.materia}">${s.materia}</h4>
+                                <div class="text-sm font-mono text-emerald-400 mt-1 flex gap-3">
+                                    <span>⏱ ${s.duracao}</span>
+                                    <span class="text-slate-500">🕒 ${txtHorario}</span>
+                                </div>
+                            </div>
+                            <button onclick="excluirSessao(${s.id})" class="bg-rose-900/40 hover:bg-rose-600 text-rose-400 hover:text-white p-2.5 rounded-lg transition shrink-0 cursor-pointer" title="Excluir tempo">
+                                🗑️
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('modalDia').classList.remove('hidden');
+        }
+
+        function excluirSessao(id) {
+            if(confirm("Tem certeza que deseja apagar este tempo de estudo?")) {
+                sessoesSalvas = sessoesSalvas.filter(s => s.id !== id);
+                atualizarBancoEDisplay();
+                
+                const modalAberto = document.getElementById('tituloModalDia').textContent;
+                const dataNoTitulo = modalAberto.replace('Estudos do dia ', '');
+                const partes = dataNoTitulo.split('/');
+                const dataString = `${partes[2]}-${partes[1]}-${partes[0]}`;
+                
+                abrirDetalhesDia(dataString);
+            }
+        }
+
+        // --- GRÁFICO (CHART.JS) ---
+        let graficoInstance = null;
+
+        function configurarDatasPadrao() {
+            const fim = new Date();
+            const inicio = new Date();
+            inicio.setDate(fim.getDate() - 6); 
+
+            function formataParaBR(dataObj) {
+                return `${String(dataObj.getDate()).padStart(2, '0')}/${String(dataObj.getMonth() + 1).padStart(2, '0')}/${dataObj.getFullYear()}`;
+            }
+
+            document.getElementById('dataFim').value = formataParaBR(fim);
+            document.getElementById('dataInicio').value = formataParaBR(inicio);
+        }
+
+        function converterDataBRParaEUA(dataBr) {
+            const partes = dataBr.split('/');
+            return `${partes[2]}-${partes[1]}-${partes[0]}`;
+        }
+
+        function atualizarGrafico() {
+            const txtInicio = document.getElementById('dataInicio').value;
+            const txtFim = document.getElementById('dataFim').value;
+
+            if(!txtInicio || !txtFim) return;
+
+            const dataInicio = new Date(converterDataBRParaEUA(txtInicio) + "T00:00:00");
+            const dataFim = new Date(converterDataBRParaEUA(txtFim) + "T23:59:59");
+
+            let labels = [];
+            let dadosHoras = [];
+            let totalSegundosPeriodo = 0;
+            
+            let dataCursor = new Date(dataInicio);
+            while(dataCursor <= dataFim) {
+                const dataString = dataCursor.toISOString().split('T')[0];
+                const partes = dataString.split('-');
+                labels.push(`${partes[2]}/${partes[1]}/${partes[0]}`); 
+                
+                const sessoesDoDia = sessoesSalvas.filter(s => s.data === dataString);
+                let segundosDoDia = 0;
+                sessoesDoDia.forEach(s => { segundosDoDia += timeToSeconds(s.duracao); });
+                
+                totalSegundosPeriodo += segundosDoDia;
+                dadosHoras.push((segundosDoDia / 3600).toFixed(4)); 
+                
+                dataCursor.setDate(dataCursor.getDate() + 1);
+            }
+
+            const txtHoras = Math.floor(totalSegundosPeriodo / 3600);
+            const txtMinutos = Math.floor((totalSegundosPeriodo % 3600) / 60);
+            const txtSegundos = totalSegundosPeriodo % 60;
+            document.getElementById('textoTotalPeriodo').textContent = 
+                `${String(txtHoras).padStart(2, '0')}h ${String(txtMinutos).padStart(2, '0')}m ${String(txtSegundos).padStart(2, '0')}s`;
+
+            if(graficoInstance) { graficoInstance.destroy(); }
+
+            const ctx = document.getElementById('graficoEstudos').getContext('2d');
+            graficoInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Horas Estudadas',
+                        data: dadosHoras,
+                        backgroundColor: '#10b981',
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let horasDecimais = context.raw;
+                                    let totalSeg = Math.round(horasDecimais * 3600);
+                                    let h = Math.floor(totalSeg / 3600);
+                                    let m = Math.floor((totalSeg % 3600) / 60);
+                                    let s = totalSeg % 60;
+                                    return ` ${h}h ${m}m ${s}s`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#334155' },
+                            ticks: { 
+                                color: '#94a3b8',
+                                callback: function(value) {
+                                    let h = Math.floor(value);
+                                    let m = Math.round((value - h) * 60);
+                                    if(h === 0 && m === 0 && value > 0) return ''; 
+                                    return `${h}h ${m}m`;
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- UTILITÁRIOS ---
+        function formatarTempo(totalSegundos) {
+            const hrs = Math.floor(totalSegundos / 3600).toString().padStart(2, '0');
+            const mins = Math.floor((totalSegundos % 3600) / 60).toString().padStart(2, '0');
+            const segs = (totalSegundos % 60).toString().padStart(2, '0');
+            return `${hrs}:${mins}:${segs}`;
+        }
+
+        function timeToSeconds(timeStr) {
+            const partes = timeStr.split(':');
+            return (+partes[0]) * 3600 + (+partes[1]) * 60 + (+partes[2]);
+        }
+
+        function fecharModal(idModal) {
+            document.getElementById(idModal).classList.add('hidden');
+        }
+
+        function atualizarBancoEDisplay() {
+            localStorage.setItem('sessoesEstudo', JSON.stringify(sessoesSalvas));
+            renderizarCalendario();
+            atualizarGrafico();
+        }
+
+        function exportarExcel() {
+            if (sessoesSalvas.length === 0) return alert("Nenhuma hora registrada.");
+            const dadosExcel = sessoesSalvas.map(s => {
+                const p = s.data.split('-');
+                let txtHorario = s.horarioInicio ? `${s.horarioInicio} às ${s.horarioFim}` : s.horario;
+                return {
+                    "Assunto": s.materia,
+                    "Data": `${p[2]}/${p[1]}/${p[0]}`,
+                    "Horário": txtHorario,
+                    "Duração": s.duracao
+                };
+            });
+            const planilha = XLSX.utils.json_to_sheet(dadosExcel);
+            const livro = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(livro, planilha, "Estudos");
+            XLSX.writeFile(livro, "Relatorio_Estudos.xlsx");
+        }
+
+        // --- INICIALIZAÇÃO ---
+        document.getElementById('inputMateria').addEventListener("keyup", (e) => { if(e.key === "Enter") salvarSessao(); });
+        
+        configurarDatasPadrao();
+        atualizarBancoEDisplay();
+    </script>
+</body>
+</html>
