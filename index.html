@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Estudos</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS (Excel) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Chart.js (Gráficos) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Flatpickr (Calendário Customizado) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://npmcdn.com/flatpickr/dist/l10n/pt.js"></script>
@@ -24,6 +28,7 @@
 
     <div class="max-w-7xl mx-auto space-y-6">
         
+        <!-- CABEÇALHO -->
         <header class="flex flex-col md:flex-row justify-between items-center bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-emerald-400">Meu Dashboard de Estudos</h1>
@@ -34,8 +39,10 @@
             </button>
         </header>
 
+        <!-- LINHA SUPERIOR: CRONÔMETRO E GRÁFICO -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
+            <!-- CRONÔMETRO -->
             <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex flex-col justify-center items-center text-center">
                 <h2 class="text-lg font-semibold text-slate-300 mb-6 uppercase text-sm tracking-widest">Cronômetro Livre</h2>
                 
@@ -59,6 +66,7 @@
                 </button>
             </div>
 
+            <!-- GRÁFICO DE DESEMPENHO -->
             <div class="lg:col-span-2 bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex flex-col">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                     <h2 class="text-lg font-semibold text-slate-300 uppercase text-sm tracking-widest">Desempenho por Período</h2>
@@ -82,6 +90,7 @@
             </div>
         </div>
 
+        <!-- CALENDÁRIO -->
         <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
             <div class="flex justify-between items-center mb-6">
                 <h2 id="calendarMonthYear" class="text-xl font-bold text-slate-200"></h2>
@@ -99,6 +108,7 @@
         </div>
     </div>
 
+    <!-- MODAL 1: SALVAR SESSÃO -->
     <div id="modalSalvar" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-md w-full shadow-2xl">
             <h3 class="text-lg font-bold text-white mb-2">Sessão Finalizada! 🎉</h3>
@@ -116,6 +126,7 @@
         </div>
     </div>
 
+    <!-- MODAL 2: DETALHES DO DIA -->
     <div id="modalDia" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[80vh]">
             <div class="flex justify-between items-center mb-4">
@@ -135,7 +146,6 @@
 
         let sessoesSalvas = JSON.parse(localStorage.getItem('sessoesEstudo')) || [];
         
-        // --- MOTOR DO CRONÔMETRO ---
         let intervalo = null;
         let estaRodando = false;
         
@@ -147,7 +157,14 @@
         const btnPlayPause = document.getElementById('btnPlayPause');
         const btnParar = document.getElementById('btnParar');
 
-        // A SUA LÓGICA DE ATUALIZAÇÃO VISUAL APLICADA AQUI
+        // --- FUNÇÃO AUXILIAR PARA CORRIGIR O FUSO HORÁRIO ---
+        function extrairDataLocal(dataObj) {
+            const ano = dataObj.getFullYear();
+            const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+            const dia = String(dataObj.getDate()).padStart(2, '0');
+            return `${ano}-${mes}-${dia}`;
+        }
+
         function sincronizarRelogio() {
             if (estaRodando) {
                 let tempoAtualMs = tempoAcumuladoMs + (Date.now() - momentoPlayAtual);
@@ -156,7 +173,6 @@
             }
         }
 
-        // A MÁGICA: Ouve quando você volta para a aba e chama a sua lógica automaticamente
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible") {
                 sincronizarRelogio();
@@ -165,7 +181,6 @@
 
         function alternarTimer() {
             if (estaRodando) {
-                // PAUSE
                 clearInterval(intervalo);
                 tempoAcumuladoMs += Date.now() - momentoPlayAtual;
                 
@@ -173,7 +188,6 @@
                 btnPlayPause.className = "flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer";
                 estaRodando = false;
             } else {
-                // PLAY
                 if (tempoAcumuladoMs === 0) {
                     dataHoraInicioSessao = new Date(); 
                 }
@@ -238,7 +252,7 @@
                 id: Date.now(),
                 materia: materia,
                 duracao: duracaoExata,
-                data: dataFim.toISOString().split('T')[0],
+                data: extrairDataLocal(dataFim), // CORREÇÃO APLICADA AQUI
                 horarioInicio: dataHoraInicioSessao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                 horarioFim: dataFim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
             };
@@ -382,7 +396,8 @@
             
             let dataCursor = new Date(dataInicio);
             while(dataCursor <= dataFim) {
-                const dataString = dataCursor.toISOString().split('T')[0];
+                // CORREÇÃO APLICADA AQUI NO GRÁFICO TAMBÉM
+                const dataString = extrairDataLocal(dataCursor);
                 const partes = dataString.split('-');
                 labels.push(`${partes[2]}/${partes[1]}/${partes[0]}`); 
                 
