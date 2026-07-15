@@ -16,8 +16,13 @@
     <script src="https://npmcdn.com/flatpickr/dist/l10n/pt.js"></script>
     <style>
         .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-        .calendar-day { min-height: 90px; cursor: pointer; transition: all 0.2s; }
+        .calendar-day { min-height: 100px; cursor: pointer; transition: all 0.2s; }
         .calendar-day:hover { border-color: #10b981; background-color: #0f172a; }
+        
+        /* Estilos de Arrastar e Soltar */
+        .dragging { opacity: 0.4; border: 2px dashed #10b981; }
+        .drag-over { background-color: #1e293b !important; border-color: #10b981 !important; }
+
         .flatpickr-calendar { background: #1e293b; border: 1px solid #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); }
         .flatpickr-day, .flatpickr-weekday, .flatpickr-current-month .flatpickr-monthDropdown-months { color: #f1f5f9 !important; }
         .flatpickr-day:hover { background: #334155; }
@@ -38,6 +43,11 @@
                 📊 Exportar para Excel
             </button>
         </header>
+
+        <!-- ALERTA DE BLOQUEIO DE DATA FUTURA (FLUTUANTE) -->
+        <div id="alertaErro" class="fixed top-5 left-1/2 -translate-x-1/2 bg-rose-600 border border-rose-500 text-white px-6 py-3 rounded-xl shadow-2xl z-[999] hidden transition duration-300 transform">
+            ⚠️ Não é permitido mover estudos para uma data futura!
+        </div>
 
         <!-- LINHA SUPERIOR: CRONÔMETRO E GRÁFICO -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -157,7 +167,6 @@
         const btnPlayPause = document.getElementById('btnPlayPause');
         const btnParar = document.getElementById('btnParar');
 
-        // --- FUNÇÃO AUXILIAR PARA CORRIGIR O FUSO HORÁRIO ---
         function extrairDataLocal(dataObj) {
             const ano = dataObj.getFullYear();
             const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
@@ -252,7 +261,7 @@
                 id: Date.now(),
                 materia: materia,
                 duracao: duracaoExata,
-                data: extrairDataLocal(dataFim), // CORREÇÃO APLICADA AQUI
+                data: extrairDataLocal(dataFim),
                 horarioInicio: dataHoraInicioSessao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                 horarioFim: dataFim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
             };
@@ -290,14 +299,21 @@
                 let ehHoje = dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear();
                 let classeNumero = ehHoje ? "bg-blue-600 text-white px-1.5 py-0.5 rounded-md" : "text-slate-400";
                 
+                // Monta o HTML dos dias com suporte a receber Drop (Soltar)
                 let htmlSessoes = sessoesDoDia.map(s => 
-                    `<div class="bg-emerald-900/60 border border-emerald-700/50 text-[10px] text-emerald-200 p-1 rounded mb-1 truncate">
+                    `<div id="task-${s.id}" draggable="true" ondragstart="aoIniciarArrasto(event, ${s.id})" 
+                          class="bg-emerald-900/60 hover:bg-emerald-800/80 border border-emerald-700/50 text-[10px] text-emerald-200 p-1 rounded mb-1 truncate cursor-grab active:cursor-grabbing">
                         ${s.materia}
                     </div>`
                 ).join('');
 
                 containerDias.innerHTML += `
-                    <div onclick="abrirDetalhesDia('${dataString}')" class="calendar-day bg-slate-900 border border-slate-700/60 p-2 rounded-xl flex flex-col overflow-hidden">
+                    <div data-date="${dataString}" 
+                         onclick="aoClicarDia(event, '${dataString}')"
+                         ondragover="aoArrastarSobre(event)" 
+                         ondragleave="aoSairDoAlvo(event)" 
+                         ondrop="aoSoltarElemento(event)" 
+                         class="calendar-day bg-slate-900 border border-slate-700/60 p-2 rounded-xl flex flex-col overflow-hidden">
                         <span class="text-xs font-bold mb-1 self-start ${classeNumero}">${dia}</span>
                         <div class="flex-1 overflow-y-auto no-scrollbar">${htmlSessoes}</div>
                     </div>
@@ -308,6 +324,67 @@
         function mudarMes(direcao) {
             dataAtual.setMonth(dataAtual.getMonth() + direcao);
             renderizarCalendario();
+        }
+
+        // --- LÓGICA DE ARRASTAR E SOLTAR (DRAG & DROP) ---
+        function aoIniciarArrasto(event, idSessao) {
+            event.dataTransfer.setData("text/plain", idSessao);
+            event.target.classList.add("dragging");
+        }
+
+        function aoArrastarSobre(event) {
+            event.preventDefault(); // Necessário para permitir o drop
+            const elementoAlvo = event.currentTarget;
+            elementoAlvo.classList.add("drag-over");
+        }
+
+        function aoSairDoAlvo(event) {
+            event.currentTarget.classList.remove("drag-over");
+        }
+
+        function aoSoltarElemento(event) {
+            event.preventDefault();
+            const elementoAlvo = event.currentTarget;
+            elementoAlvo.classList.remove("drag-over");
+            
+            const idSessao = event.dataTransfer.getData("text/plain");
+            const dataAlvoStr = elementoAlvo.getAttribute("data-date"); // Formato YYYY-MM-DD
+            
+            // Remove classe de arrasto da tarefa original
+            const tarefaArrastada = document.getElementById(`task-${idSessao}`);
+            if (tarefaArrastada) tarefaArrastada.classList.remove("dragging");
+
+            // --- REGRA DE OURO: Bloquear Data Futura ---
+            const hojeLocalStr = extrairDataLocal(new Date());
+            
+            // Comparação direta de strings YYYY-MM-DD funciona perfeitamente para saber o que é futuro
+            if (dataAlvoStr > hojeLocalStr) {
+                mostrarAlertaErro();
+                return;
+            }
+
+            // Atualiza a data do estudo no array
+            const sessao = sessoesSalvas.find(s => s.id == idSessao);
+            if (sessao) {
+                sessao.data = dataAlvoStr;
+                atualizarBancoEDisplay();
+            }
+        }
+
+        function mostrarAlertaErro() {
+            const alerta = document.getElementById("alertaErro");
+            alerta.classList.remove("hidden");
+            setTimeout(() => {
+                alerta.classList.add("hidden");
+            }, 3000);
+        }
+
+        // Garante que clicar no bloquinho que você está arrastando não abra o modal de detalhes do dia
+        function aoClicarDia(event, dataString) {
+            if (event.target.closest('[draggable="true"]')) {
+                return; // Se clicou na tarefa, não faz nada
+            }
+            abrirDetalhesDia(dataString);
         }
 
         // --- DETALHES DO DIA E EXCLUSÃO ---
@@ -396,7 +473,6 @@
             
             let dataCursor = new Date(dataInicio);
             while(dataCursor <= dataFim) {
-                // CORREÇÃO APLICADA AQUI NO GRÁFICO TAMBÉM
                 const dataString = extrairDataLocal(dataCursor);
                 const partes = dataString.split('-');
                 labels.push(`${partes[2]}/${partes[1]}/${partes[0]}`); 
@@ -483,6 +559,12 @@
         function timeToSeconds(timeStr) {
             const partes = timeStr.split(':');
             return (+partes[0]) * 3600 + (+partes[1]) * 60 + (+partes[2]);
+        }
+
+        // Fecha modais com clique fora
+        window.onclick = function(event) {
+            if (event.target.id === 'modalSalvar') fecharModal('modalSalvar');
+            if (event.target.id === 'modalDia') fecharModal('modalDia');
         }
 
         function fecharModal(idModal) {
