@@ -160,7 +160,7 @@
         </div>
     </div>
 
-    <!-- MODAL 3: EDITAR SESSÃO DE ESTUDO -->
+    <!-- MODAL 3: EDITAR SESSÃO DE ESTUDO (COM CALCULADORA DE MINUTOS) -->
     <div id="modalEditar" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-[60]">
         <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4">
             <h3 class="text-lg font-bold text-emerald-400">Editar Sessão de Estudo</h3>
@@ -171,15 +171,24 @@
                 <input type="text" id="editMateria" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500">
             </div>
 
+            <!-- NOVO CAMPO: ADICIONAR MINUTOS DE FORMA SIMPLES -->
+            <div class="bg-slate-900/80 p-3.5 rounded-xl border border-emerald-500/30">
+                <label class="block text-xs font-semibold uppercase text-emerald-400 mb-1">➕ Adicionar Minutos Faltantes</label>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="addMinutos" min="1" placeholder="Ex: 30" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white font-mono focus:outline-none focus:border-emerald-500">
+                    <span class="text-xs text-slate-400 shrink-0">minutos</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1.5">Digite os minutos que faltaram para o app somar ao total automaticamente.</p>
+            </div>
+
             <div>
-                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Duração Real (HH:MM:SS)</label>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Ou edite a Duração Total (HH:MM:SS)</label>
                 <input type="text" id="editDuracao" placeholder="01:10:00" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
-                <p class="text-[11px] text-slate-400 mt-1">💡 O horário de início será recuado automaticamente para ajustar à nova duração.</p>
             </div>
 
             <div class="flex gap-3 justify-end pt-2">
                 <button onclick="fecharModal('modalEditar')" class="px-4 py-2 text-slate-400 hover:text-white transition cursor-pointer">Cancelar</button>
-                <button onclick="salvarEdicaoSessao()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 font-semibold text-white rounded-xl transition cursor-pointer">Atualizar</button>
+                <button onclick="salvarEdicaoSessao()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 font-semibold text-white rounded-xl transition cursor-pointer">Salvar Ajuste</button>
             </div>
         </div>
     </div>
@@ -486,7 +495,7 @@
             document.getElementById('modalDia').classList.remove('hidden');
         }
 
-        // --- LÓGICA DE EDIÇÃO DA SESSÃO ---
+        // --- LÓGICA DE EDIÇÃO E CALCULADORA INTEGRADA ---
         function abrirModalEditar(id) {
             const sessao = sessoesSalvas.find(s => s.id === id);
             if (!sessao) return;
@@ -494,6 +503,7 @@
             document.getElementById('editSessaoId').value = sessao.id;
             document.getElementById('editMateria').value = sessao.materia;
             document.getElementById('editDuracao').value = sessao.duracao;
+            document.getElementById('addMinutos').value = ""; // Reseta o campo de aditivo
 
             document.getElementById('modalEditar').classList.remove('hidden');
         }
@@ -501,34 +511,40 @@
         function salvarEdicaoSessao() {
             const id = parseInt(document.getElementById('editSessaoId').value);
             const novaMateria = document.getElementById('editMateria').value.trim() || "Estudo Geral";
-            const novaDuracaoStr = document.getElementById('editDuracao').value.trim();
-
-            // Validação simples de formato HH:MM:SS
-            if (!/^\d{2}:\d{2}:\d{2}$/.test(novaDuracaoStr)) {
-                alert("Por favor, digite a duração no formato exato HH:MM:SS (Exemplo: 01:10:00).");
-                return;
-            }
+            let novaDuracaoStr = document.getElementById('editDuracao').value.trim();
+            const minutosAdicionais = parseInt(document.getElementById('addMinutos').value) || 0;
 
             const sessao = sessoesSalvas.find(s => s.id === id);
             if (!sessao) return;
 
+            // Se o usuário digitou minutos adicionais, soma automaticamente
+            if (minutosAdicionais > 0) {
+                let segundosAtuais = timeToSeconds(novaDuracaoStr);
+                let segundosFinais = segundosAtuais + (minutosAdicionais * 60);
+                novaDuracaoStr = formatarTempo(segundosFinais);
+            }
+
+            // Validação de formato HH:MM:SS
+            if (!/^\d{2}:\d{2}:\d{2}$/.test(novaDuracaoStr)) {
+                alert("Por favor, verifique o formato da duração (deve ser HH:MM:SS).");
+                return;
+            }
+
             sessao.materia = novaMateria;
             sessao.duracao = novaDuracaoStr;
 
-            // Se existir um Horário Fim (ex: "21:20"), recalcula o Horário de Início recuando a nova duração
+            // Recalcula Horário Inicial preservando o Horário Fim
             if (sessao.horarioFim) {
                 const [hFim, mFim] = sessao.horarioFim.split(':').map(Number);
                 const novosSegundosTotais = timeToSeconds(novaDuracaoStr);
 
-                // Converte Horário Fim para minutos absolutos do dia
                 let minutosFimNoDia = (hFim * 60) + mFim;
                 let minutosDuracao = Math.floor(novosSegundosTotais / 60);
 
                 let minutosInicioNoDia = minutosFimNoDia - minutosDuracao;
                 
-                // Trata virada de dia caso recue além da meia-noite
                 if (minutosInicioNoDia < 0) {
-                    minutosInicioNoDia += 1440; // 24h em minutos
+                    minutosInicioNoDia += 1440; // 24 horas em minutos
                 }
 
                 let hInicio = Math.floor(minutosInicioNoDia / 60).toString().padStart(2, '0');
@@ -539,8 +555,6 @@
 
             atualizarBancoEDisplay();
             fecharModal('modalEditar');
-
-            // Atualiza a visualização no modal do dia
             abrirDetalhesDia(sessao.data);
         }
 
