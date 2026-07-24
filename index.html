@@ -37,16 +37,14 @@
                 <p class="text-slate-400 text-sm">Controle de horas, monitoramento e produtividade</p>
             </div>
             
-            <!-- Grupo de Ações -->
             <div class="flex flex-wrap gap-3 items-center justify-center">
-                <!-- Inputs invisíveis para o gatilho de importação -->
                 <input type="file" id="inputImportarJson" accept=".json" class="hidden" onchange="importarBackupJson(event)">
                 
-                <button onclick="exportarBackupJson()" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold py-2 px-4 rounded-xl transition flex items-center gap-2 cursor-pointer" title="Salvar arquivo de segurança das suas horas">
+                <button onclick="exportarBackupJson()" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold py-2 px-4 rounded-xl transition flex items-center gap-2 cursor-pointer">
                     💾 Salvar Backup (.json)
                 </button>
                 
-                <button onclick="document.getElementById('inputImportarJson').click()" class="bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold py-2 px-4 rounded-xl transition flex items-center gap-2 cursor-pointer" title="Recuperar dados apagados do cache">
+                <button onclick="document.getElementById('inputImportarJson').click()" class="bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold py-2 px-4 rounded-xl transition flex items-center gap-2 cursor-pointer">
                     📂 Restaurar Backup
                 </button>
                 
@@ -158,6 +156,30 @@
             <div id="listaSessoesDia" class="flex-1 overflow-y-auto space-y-3 pr-2 mb-4"></div>
             <div class="mt-auto pt-4 border-t border-slate-700 flex justify-end">
                 <button onclick="fecharModal('modalDia')" class="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition cursor-pointer">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: EDITAR SESSÃO DE ESTUDO -->
+    <div id="modalEditar" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-[60]">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4">
+            <h3 class="text-lg font-bold text-emerald-400">Editar Sessão de Estudo</h3>
+            <input type="hidden" id="editSessaoId">
+            
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Matéria / Assunto</label>
+                <input type="text" id="editMateria" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Duração Real (HH:MM:SS)</label>
+                <input type="text" id="editDuracao" placeholder="01:10:00" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+                <p class="text-[11px] text-slate-400 mt-1">💡 O horário de início será recuado automaticamente para ajustar à nova duração.</p>
+            </div>
+
+            <div class="flex gap-3 justify-end pt-2">
+                <button onclick="fecharModal('modalEditar')" class="px-4 py-2 text-slate-400 hover:text-white transition cursor-pointer">Cancelar</button>
+                <button onclick="salvarEdicaoSessao()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 font-semibold text-white rounded-xl transition cursor-pointer">Atualizar</button>
             </div>
         </div>
     </div>
@@ -385,7 +407,7 @@
             abrirDetalhesDia(dataString);
         }
 
-        // --- SISTEMA DE BACKUP DE SEGURANÇA (JSON) ---
+        // --- BACKUP JSON ---
         function exportarBackupJson() {
             if (sessoesSalvas.length === 0) return alert("Você não tem dados para exportar.");
             
@@ -410,8 +432,7 @@
                     const dadosImportados = JSON.parse(e.target.result);
                     
                     if (Array.isArray(dadosImportados)) {
-                        if (confirm(`Atenção: Deseja importar as ${dadosImportados.length} sessões encontradas no arquivo? Isso se somará aos dados atuais.`)) {
-                            // Mescla os dados antigos com os novos, removendo duplicados por ID
+                        if (confirm(`Deseja importar as ${dadosImportados.length} sessões encontradas?`)) {
                             const mapaSessoes = new Map();
                             sessoesSalvas.forEach(s => mapaSessoes.set(s.id, s));
                             dadosImportados.forEach(s => mapaSessoes.set(s.id, s));
@@ -421,17 +442,17 @@
                             alert("Backup restaurado com sucesso! 🎉");
                         }
                     } else {
-                        alert("Arquivo inválido. Formato incompatível.");
+                        alert("Arquivo inválido.");
                     }
                 } catch (err) {
-                    alert("Erro ao ler o arquivo de backup. Certifique-se de selecionar o arquivo .json correto.");
+                    alert("Erro ao ler o arquivo de backup.");
                 }
             };
             leitor.readAsText(arquivo);
-            event.target.value = ""; // Reseta o input de arquivo
+            event.target.value = ""; 
         }
 
-        // --- DETALHES DO DIA E EXCLUSÃO ---
+        // --- DETALHES DO DIA, EDIÇÃO E EXCLUSÃO ---
         function abrirDetalhesDia(dataString) {
             const sessoes = sessoesSalvas.filter(s => s.data === dataString);
             const partes = dataString.split('-');
@@ -454,12 +475,73 @@
                                     <span class="text-slate-500">🕒 ${txtHorario}</span>
                                 </div>
                             </div>
-                            <button onclick="excluirSessao(${s.id})" class="bg-rose-900/40 hover:bg-rose-600 text-rose-400 hover:text-white p-2.5 rounded-lg transition shrink-0 cursor-pointer">🗑️</button>
+                            <div class="flex gap-2 shrink-0">
+                                <button onclick="abrirModalEditar(${s.id})" class="bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white p-2.5 rounded-lg transition cursor-pointer" title="Editar sessão">✏️</button>
+                                <button onclick="excluirSessao(${s.id})" class="bg-rose-900/40 hover:bg-rose-600 text-rose-400 hover:text-white p-2.5 rounded-lg transition cursor-pointer" title="Excluir sessão">🗑️</button>
+                            </div>
                         </div>
                     `;
                 });
             }
             document.getElementById('modalDia').classList.remove('hidden');
+        }
+
+        // --- LÓGICA DE EDIÇÃO DA SESSÃO ---
+        function abrirModalEditar(id) {
+            const sessao = sessoesSalvas.find(s => s.id === id);
+            if (!sessao) return;
+
+            document.getElementById('editSessaoId').value = sessao.id;
+            document.getElementById('editMateria').value = sessao.materia;
+            document.getElementById('editDuracao').value = sessao.duracao;
+
+            document.getElementById('modalEditar').classList.remove('hidden');
+        }
+
+        function salvarEdicaoSessao() {
+            const id = parseInt(document.getElementById('editSessaoId').value);
+            const novaMateria = document.getElementById('editMateria').value.trim() || "Estudo Geral";
+            const novaDuracaoStr = document.getElementById('editDuracao').value.trim();
+
+            // Validação simples de formato HH:MM:SS
+            if (!/^\d{2}:\d{2}:\d{2}$/.test(novaDuracaoStr)) {
+                alert("Por favor, digite a duração no formato exato HH:MM:SS (Exemplo: 01:10:00).");
+                return;
+            }
+
+            const sessao = sessoesSalvas.find(s => s.id === id);
+            if (!sessao) return;
+
+            sessao.materia = novaMateria;
+            sessao.duracao = novaDuracaoStr;
+
+            // Se existir um Horário Fim (ex: "21:20"), recalcula o Horário de Início recuando a nova duração
+            if (sessao.horarioFim) {
+                const [hFim, mFim] = sessao.horarioFim.split(':').map(Number);
+                const novosSegundosTotais = timeToSeconds(novaDuracaoStr);
+
+                // Converte Horário Fim para minutos absolutos do dia
+                let minutosFimNoDia = (hFim * 60) + mFim;
+                let minutosDuracao = Math.floor(novosSegundosTotais / 60);
+
+                let minutosInicioNoDia = minutosFimNoDia - minutosDuracao;
+                
+                // Trata virada de dia caso recue além da meia-noite
+                if (minutosInicioNoDia < 0) {
+                    minutosInicioNoDia += 1440; // 24h em minutos
+                }
+
+                let hInicio = Math.floor(minutosInicioNoDia / 60).toString().padStart(2, '0');
+                let mInicio = (minutosInicioNoDia % 60).toString().padStart(2, '0');
+
+                sessao.horarioInicio = `${hInicio}:${mInicio}`;
+            }
+
+            atualizarBancoEDisplay();
+            fecharModal('modalEditar');
+
+            // Atualiza a visualização no modal do dia
+            abrirDetalhesDia(sessao.data);
         }
 
         function excluirSessao(id) {
@@ -596,6 +678,7 @@
         window.onclick = function(event) {
             if (event.target.id === 'modalSalvar') fecharModal('modalSalvar');
             if (event.target.id === 'modalDia') fecharModal('modalDia');
+            if (event.target.id === 'modalEditar') fecharModal('modalEditar');
         }
 
         function fecharModal(idModal) { document.getElementById(idModal).classList.add('hidden'); }
