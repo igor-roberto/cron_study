@@ -28,6 +28,48 @@
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-4 md:p-8">
 
+    <!-- OVERLAY MODO TELA CHEIA (FUNDO SÓLIDO E TEMPO EXTRA-GIGANTE) -->
+    <div id="modoTelaCheia" class="fixed inset-0 bg-slate-950 z-[100] hidden flex flex-col items-center justify-center p-4">
+        <!-- BOTÃO FECHAR (X) NO CANTO SUPERIOR DIREITO -->
+        <button onclick="alternarTelaCheia()" class="absolute top-8 right-8 text-slate-400 hover:text-white transition cursor-pointer p-2 rounded-full hover:bg-slate-900" title="Fechar (ESC)">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6M9 9l6 6"/>
+            </svg>
+        </button>
+
+        <div class="text-center space-y-8 w-full flex flex-col items-center justify-center">
+            <!-- CRONÔMETRO EXTRA GIGANTE -->
+            <div id="displayZen" class="text-[14vw] sm:text-[13vw] font-mono font-bold text-white tracking-widest leading-none select-none">
+                00:00:00
+            </div>
+
+            <!-- CONTROLES SUTIS E PEQUENOS -->
+            <div class="flex gap-6 items-center justify-center pt-4">
+                <!-- PLAY / PAUSE -->
+                <button id="btnPlayPauseZen" onclick="alternarTimer()" class="text-slate-300 hover:text-emerald-400 transition cursor-pointer p-3 rounded-full hover:bg-slate-900 border border-slate-800" title="Play / Pause">
+                    <svg id="iconPlayZen" class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor"/>
+                        <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/>
+                    </svg>
+                    <svg id="iconPauseZen" class="w-8 h-8 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor"/>
+                        <line x1="10" y1="9" x2="10" y2="15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="14" y1="9" x2="14" y2="15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    </svg>
+                </button>
+
+                <!-- PARAR -->
+                <button id="btnPararZen" onclick="pararTimer()" disabled class="text-slate-700 cursor-not-allowed transition p-3 rounded-full border border-slate-900" title="Parar">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor"/>
+                        <rect x="9" y="9" width="6" height="6" fill="currentColor"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="max-w-7xl mx-auto space-y-6">
         
         <!-- CABEÇALHO COM BACKUP -->
@@ -62,8 +104,17 @@
         <!-- LINHA SUPERIOR: CRONÔMETRO E GRÁFICO -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            <!-- CRONÔMETRO -->
-            <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex flex-col justify-center items-center text-center">
+            <!-- CRONÔMETRO PRINCIPAL -->
+            <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex flex-col justify-center items-center text-center relative">
+                
+                <!-- ÍCONE DE MAXIMIZAR -->
+                <button onclick="alternarTelaCheia()" class="absolute top-4 right-4 text-slate-400 hover:text-emerald-400 transition cursor-pointer p-2 rounded-xl hover:bg-slate-700/50" title="Maximizar Tela">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 9l4-4m0 0h-3m3 0v3M9 15l-4 4m0 0h3m-3 0v-3"/>
+                    </svg>
+                </button>
+
                 <h2 class="text-lg font-semibold text-slate-300 mb-6 uppercase text-sm tracking-widest">Cronômetro Livre</h2>
                 
                 <div class="w-full bg-slate-950 border border-slate-700 rounded-2xl p-6 mb-8 flex items-center justify-center overflow-hidden">
@@ -80,10 +131,6 @@
                         Parar
                     </button>
                 </div>
-
-                <button onclick="sincronizarRelogio()" class="mt-5 text-slate-500 hover:text-emerald-400 text-xs uppercase tracking-wider font-semibold transition cursor-pointer flex items-center gap-2">
-                    🔄 Sincronizar Tempo
-                </button>
             </div>
 
             <!-- GRÁFICO DE DESEMPENHO -->
@@ -129,7 +176,7 @@
     </div>
 
     <!-- MODAL 1: SALVAR SESSÃO -->
-    <div id="modalSalvar" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div id="modalSalvar" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-[110]">
         <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-md w-full shadow-2xl">
             <h3 class="text-lg font-bold text-white mb-2">Sessão Finalizada! 🎉</h3>
             <p id="modalTempoInfo" class="text-slate-400 text-sm mb-4"></p>
@@ -160,7 +207,7 @@
         </div>
     </div>
 
-    <!-- MODAL 3: EDITAR SESSÃO DE ESTUDO (COM CALCULADORA DE MINUTOS) -->
+    <!-- MODAL 3: EDITAR SESSÃO DE ESTUDO -->
     <div id="modalEditar" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-[60]">
         <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4">
             <h3 class="text-lg font-bold text-emerald-400">Editar Sessão de Estudo</h3>
@@ -171,7 +218,6 @@
                 <input type="text" id="editMateria" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500">
             </div>
 
-            <!-- NOVO CAMPO: ADICIONAR MINUTOS DE FORMA SIMPLES -->
             <div class="bg-slate-900/80 p-3.5 rounded-xl border border-emerald-500/30">
                 <label class="block text-xs font-semibold uppercase text-emerald-400 mb-1">➕ Adicionar Minutos Faltantes</label>
                 <div class="flex items-center gap-2">
@@ -207,8 +253,14 @@
         let dataHoraInicioSessao = null; 
 
         const display = document.getElementById('display');
+        const displayZen = document.getElementById('displayZen');
+        
         const btnPlayPause = document.getElementById('btnPlayPause');
         const btnParar = document.getElementById('btnParar');
+        const btnPararZen = document.getElementById('btnPararZen');
+        
+        const iconPlayZen = document.getElementById('iconPlayZen');
+        const iconPauseZen = document.getElementById('iconPauseZen');
 
         function extrairDataLocal(dataObj) {
             const ano = dataObj.getFullYear();
@@ -217,11 +269,28 @@
             return `${ano}-${mes}-${dia}`;
         }
 
+        // --- MODO TELA CHEIA ---
+        function alternarTelaCheia() {
+            const modalZen = document.getElementById('modoTelaCheia');
+            modalZen.classList.toggle('hidden');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modalZen = document.getElementById('modoTelaCheia');
+                if (!modalZen.classList.contains('hidden')) {
+                    modalZen.classList.add('hidden');
+                }
+            }
+        });
+
         function sincronizarRelogio() {
             if (estaRodando) {
                 let tempoAtualMs = tempoAcumuladoMs + (Date.now() - momentoPlayAtual);
                 let segundosExatos = Math.floor(tempoAtualMs / 1000);
-                display.textContent = formatarTempo(segundosExatos);
+                const txtTempo = formatarTempo(segundosExatos);
+                display.textContent = txtTempo;
+                displayZen.textContent = txtTempo;
             }
         }
 
@@ -236,8 +305,14 @@
                 clearInterval(intervalo);
                 tempoAcumuladoMs += Date.now() - momentoPlayAtual;
                 
+                // Atualiza Botão Dashboard
                 btnPlayPause.textContent = "Play";
                 btnPlayPause.className = "flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer";
+                
+                // Atualiza Ícones Modo Zen
+                iconPlayZen.classList.remove('hidden');
+                iconPauseZen.classList.add('hidden');
+
                 estaRodando = false;
             } else {
                 if (tempoAcumuladoMs === 0) {
@@ -249,13 +324,25 @@
                 intervalo = setInterval(() => {
                     let tempoAtualMs = tempoAcumuladoMs + (Date.now() - momentoPlayAtual);
                     let segundosExatos = Math.floor(tempoAtualMs / 1000);
-                    display.textContent = formatarTempo(segundosExatos);
+                    const txtTempo = formatarTempo(segundosExatos);
+                    
+                    display.textContent = txtTempo;
+                    displayZen.textContent = txtTempo;
                 }, 250); 
 
+                // Atualiza Botão Dashboard
                 btnPlayPause.textContent = "Pause";
                 btnPlayPause.className = "flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer";
                 btnParar.disabled = false;
                 btnParar.className = "flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer";
+                
+                // Atualiza Modo Zen
+                iconPlayZen.classList.add('hidden');
+                iconPauseZen.classList.remove('hidden');
+                
+                btnPararZen.disabled = false;
+                btnPararZen.className = "text-slate-300 hover:text-rose-400 transition cursor-pointer p-3 rounded-full hover:bg-slate-900 border border-slate-800";
+
                 estaRodando = true;
             }
         }
@@ -273,11 +360,22 @@
             const tempoSessaoFinalizada = formatarTempo(tempoTotalSegundos);
             const dataHoraFimSessao = new Date(); 
 
+            // Reseta Botões Dashboard
             btnPlayPause.textContent = "Play";
             btnPlayPause.className = "flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition cursor-pointer";
             btnParar.disabled = true;
             btnParar.className = "flex-1 bg-rose-600/50 text-rose-300 font-bold py-3 px-4 rounded-xl cursor-not-allowed opacity-50 transition";
             
+            // Reseta Modo Zen
+            iconPlayZen.classList.remove('hidden');
+            iconPauseZen.classList.add('hidden');
+            
+            btnPararZen.disabled = true;
+            btnPararZen.className = "text-slate-700 cursor-not-allowed transition p-3 rounded-full border border-slate-900";
+
+            // Fecha tela cheia se estiver ativa
+            document.getElementById('modoTelaCheia').classList.add('hidden');
+
             document.getElementById('modalTempoInfo').innerHTML = `Tempo total: <span class="text-emerald-400 font-mono font-bold">${tempoSessaoFinalizada}</span>`;
             
             const btnSalvar = document.getElementById('btnSalvarSessao');
@@ -290,6 +388,7 @@
             
             tempoAcumuladoMs = 0;
             display.textContent = "00:00:00";
+            displayZen.textContent = "00:00:00";
         }
 
         function salvarSessao() {
@@ -495,7 +594,6 @@
             document.getElementById('modalDia').classList.remove('hidden');
         }
 
-        // --- LÓGICA DE EDIÇÃO E CALCULADORA INTEGRADA ---
         function abrirModalEditar(id) {
             const sessao = sessoesSalvas.find(s => s.id === id);
             if (!sessao) return;
@@ -503,7 +601,7 @@
             document.getElementById('editSessaoId').value = sessao.id;
             document.getElementById('editMateria').value = sessao.materia;
             document.getElementById('editDuracao').value = sessao.duracao;
-            document.getElementById('addMinutos').value = ""; // Reseta o campo de aditivo
+            document.getElementById('addMinutos').value = ""; 
 
             document.getElementById('modalEditar').classList.remove('hidden');
         }
@@ -517,14 +615,12 @@
             const sessao = sessoesSalvas.find(s => s.id === id);
             if (!sessao) return;
 
-            // Se o usuário digitou minutos adicionais, soma automaticamente
             if (minutosAdicionais > 0) {
                 let segundosAtuais = timeToSeconds(novaDuracaoStr);
                 let segundosFinais = segundosAtuais + (minutosAdicionais * 60);
                 novaDuracaoStr = formatarTempo(segundosFinais);
             }
 
-            // Validação de formato HH:MM:SS
             if (!/^\d{2}:\d{2}:\d{2}$/.test(novaDuracaoStr)) {
                 alert("Por favor, verifique o formato da duração (deve ser HH:MM:SS).");
                 return;
@@ -533,7 +629,6 @@
             sessao.materia = novaMateria;
             sessao.duracao = novaDuracaoStr;
 
-            // Recalcula Horário Inicial preservando o Horário Fim
             if (sessao.horarioFim) {
                 const [hFim, mFim] = sessao.horarioFim.split(':').map(Number);
                 const novosSegundosTotais = timeToSeconds(novaDuracaoStr);
@@ -544,7 +639,7 @@
                 let minutosInicioNoDia = minutosFimNoDia - minutosDuracao;
                 
                 if (minutosInicioNoDia < 0) {
-                    minutosInicioNoDia += 1440; // 24 horas em minutos
+                    minutosInicioNoDia += 1440; 
                 }
 
                 let hInicio = Math.floor(minutosInicioNoDia / 60).toString().padStart(2, '0');
